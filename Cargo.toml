@@ -1,0 +1,12 @@
+[package]
+name = "trustnet"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.98"
+base64 = "0.22.1"
+openssl = { version = "0.10.72", features = ["vendored"] } 
+rand = "0.9.1"
+rsa = "0.9.8"
+sha2 = "0.10.8"
