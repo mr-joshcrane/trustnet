@@ -9,7 +9,7 @@ use sha2::Sha256;
 use openssl::hash::MessageDigest;
 use openssl::pkey::{PKey, Private, Public};
 use openssl::rsa::Rsa as OSSLRSA;
-use openssl::x509::{X509Builder, X509NameBuilder, X509};
+pub(crate) use openssl::x509::{X509Builder, X509NameBuilder, X509};
 
 use anyhow::{anyhow, Error, Ok};
 
@@ -25,9 +25,12 @@ pub struct TrustStore {
     pub certificate_authorities: Vec<X509>,
 }
 
+#[allow(clippy::new_without_default)]
 impl TrustStore {
     pub fn new() -> Self {
-        TrustStore { certificate_authorities: Vec::new() }
+        TrustStore {
+            certificate_authorities: Vec::new(),
+        }
     }
 
     pub fn add_cert_authority(&mut self, cert: X509) {
@@ -58,12 +61,14 @@ impl Entity {
             public_key,
         })
     }
-    
+
     pub fn certificate_signing_request(&mut self, authority: &impl Authority) -> Result<(), Error> {
         let public_key = self.get_public_key();
         let certificate = authority.sign_entity(self.name.clone(), &public_key)?;
         self.certificate = Some(certificate);
-        let root_certificate = authority.authority_certificate().ok_or(anyhow!("authority didn't return it's root certificate. Has it been initialised properly?"));
+        let root_certificate = authority.authority_certificate().ok_or(anyhow!(
+            "authority didn't return it's root certificate. Has it been initialised properly?"
+        ));
         self.trust_store.add_cert_authority(root_certificate?);
         Ok(())
     }
@@ -100,7 +105,8 @@ impl Authority for Entity {
         let private_key = self.private_key()?;
         let public_key = self.public_key.clone();
         let pkey = rsa_public_key_to_pkey(&public_key)?;
-        let certificate = make_certificate(self.name.clone(), self.name.clone(), &pkey, &private_key)?;
+        let certificate =
+            make_certificate(self.name.clone(), self.name.clone(), &pkey, &private_key)?;
         self.certificate = Some(certificate.clone());
         self.trust_store.add_cert_authority(certificate);
         Ok(())
@@ -158,7 +164,6 @@ fn make_certificate(
     let mut issuer_builder = X509NameBuilder::new()?;
     issuer_builder.append_entry_by_text("CN", &issuer_name)?;
     let issuer_name = issuer_builder.build();
-    
 
     let mut builder = X509Builder::new()?;
     builder.set_version(2)?;
@@ -238,7 +243,7 @@ mod tests {
     fn entity_can_differentiate_between_trusted_and_untrusted_authorities() {
         let mut authority = Entity::new("authority".to_string()).unwrap();
         authority.initialize_authority().unwrap();
-        
+
         let mut evil_authority = Entity::new("untrustworthy".to_string()).unwrap();
         evil_authority.initialize_authority().unwrap();
 
@@ -247,9 +252,10 @@ mod tests {
         let good_certificate = entity.certificate.as_ref().unwrap();
         assert!(entity.trust_store.is_trusted_cert(good_certificate));
 
-
         let mut evil_entity = Entity::new("evil_client".to_string()).unwrap();
-        evil_entity.certificate_signing_request(&evil_authority).unwrap();
+        evil_entity
+            .certificate_signing_request(&evil_authority)
+            .unwrap();
         let evil_certificate = evil_entity.certificate.as_ref().unwrap();
         assert!(!entity.trust_store.is_trusted_cert(evil_certificate));
     }
